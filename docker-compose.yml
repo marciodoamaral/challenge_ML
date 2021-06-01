@@ -1,54 +1,26 @@
 version: '3'
 services:
-  namenode:
-    image: fjardim/namenode_sqoop
-    container_name: namenode
-    hostname: namenode
-    volumes:
-      - ./db/data/hdfs/namenode:/hadoop/dfs/name
-      - ./db/input:/input
-    networks:
-      - backend-network
-    environment:
-      - CLUSTER_NAME=test
-    env_file:
-      - ./db/data/hadoop/hadoop-hive.env
-    ports:
-      - "50070:50070"
-    deploy:
-      resources:
-        limits:
-          memory: 500m
-  
-  datanode:
-    image: fjardim/datanode
-    container_name: datanode
-    hostname: datanode
-    volumes:
-      - ./db/data/hdfs/datanode:/hadoop/dfs/data
-    networks:
-      - backend-network
-    env_file:
-      - ./db/data/hadoop/hadoop-hive.env
-    environment:
-      SERVICE_PRECONDITION: "namenode:50070"
-    depends_on:
-      - namenode
-    ports:
-      - "50075:50075"
-    deploy:
-      resources:
-        limits:
-          memory: 500m
-
   app:
     build: app
-    container_name: python
-    hostname: python
+    container_name: app
+    hostname: app
     volumes:
       - ./app/src:/code
+    ports:
+      - 5000:5000
     networks:
       - backend-network
+      - frontend-network
+      
+  web:
+    build: web
+    container_name: web
+    hostname: web
+    ports:
+      - 80:80
+    depends_on: 
+      - app
+    networks:
       - frontend-network
     
 networks:
