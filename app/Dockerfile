@@ -12,6 +12,7 @@ RUN pip install --user -r requirements.txt
 
 # copy the content of the local src directory to the working directory
 COPY ./src/ .
+COPY ./config/ .
 
 # command to run on container start
 CMD [ "python", "./app.py" ]

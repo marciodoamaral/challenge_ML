@@ -1,5 +1,19 @@
 version: '3'
 services:
+  db:
+    image: mysql:5.7
+    container_name: db
+    hostname: db
+    ports:
+      - "33061:3306"
+    volumes:
+      - ./db:/docker-entrypoint-initdb.d/:ro
+      - ./db/db-data:/var/lib/mysql
+    networks:
+      - backend-network
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+
   app:
     build: app
     container_name: app
@@ -22,7 +36,9 @@ services:
       - app
     networks:
       - frontend-network
-    
+
+volumes:
+  db-data:
 networks:
   backend-network:
   frontend-network:
