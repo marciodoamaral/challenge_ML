@@ -38,43 +38,19 @@ def read_base_set(url):
 
         # create and execute the query
         cursor = conn.cursor()
-        if url is None:
-            cursor.execute('SELECT url FROM tb_base_set')
+        cursor.execute("SELECT id_base_set FROM tb_base_set where url = %s", (url,))
+
+        # return row using List datatype
+        row = cursor.fetchone()
+        if row is None:
+            id_base_set = None
         else:
-            cursor.execute("SELECT url FROM tb_base_set where url = %s", (url,))
-
-        # return row using List datatype
-        lst_data = [item[0] for item in cursor.fetchall()]
+            id_base_set = row[0]
 
         # close the objects
         cursor.close()
         conn.close()
-        return lst_data
-    except Error as e:
-        print(e)
-
-
-def check_register():
-    """ Read the tb_link_references file and return number of rows
-    :return: an integer number of rows
-    """
-    try:
-        # read the info from config file
-        conf_file = read_db_config()
-        # open the connection
-        conn = MySQLConnection(**conf_file)
-
-        # create and execute the query
-        cursor = conn.cursor()
-        cursor.execute('SELECT coalesce(count(1), 0) cnt FROM tb_link_references')
-
-        # return row using List datatype
-        cnt_row = cursor.fetchone()
-
-        # close the objects
-        cursor.close()
-        conn.close()
-        return cnt_row
+        return id_base_set
     except Error as e:
         print(e)
 
@@ -85,6 +61,7 @@ def write_base_set(url):
     :return: None
     """
     try:
+
         # read the info from config file
         conf_file = read_db_config()
         # open the connection
@@ -92,12 +69,18 @@ def write_base_set(url):
 
         # create and execute the query
         cursor = conn.cursor()
-        cursor.execute("Insert into tb_link_references(url) values(%(url)s)", (url,))
+        cursor.execute("""Insert into tb_base_set (url) values (%s)""", (url,))
         conn.commit()
+
+        cursor.execute("SELECT id_base_set FROM tb_base_set where url = %s", (url,))
+        # return row using List datatype
+        id_base_set = cursor.fetchone()[0]
 
         # close the objects
         cursor.close()
         conn.close()
+        return id_base_set
+
     except Error as e:
         print(e)
 
@@ -116,14 +99,13 @@ def write_link_references(lst_data):
         # create and execute the query
         cursor = conn.cursor()
 
-        sql = """Insert into tb_link_references(level, top_url, url)
-        values( %(level)s, %(parent_url)s, %(url)s)"""
+        sql = """Insert into tb_link_references_raw(id_base_set, level, top_url, url)
+        values(%(id_base_set)s, %(level)s, %(parent_url)s, %(url)s)"""
 
         for data in lst_data:
             cursor.execute(sql, data)
 
         conn.commit()
-
         # close the objects
         cursor.close()
         conn.close()
@@ -131,53 +113,108 @@ def write_link_references(lst_data):
         print(e)
 
 
-def return_links(url):
-    """ Return a list of URL´s from the database
-    :return: list of URL´s
+def read_link_references_summary(id_base_set, flg_new):
+    """ Read the tb_base_set file and return a list data type with URL column
+    :param id_base_set: URL which should be filter
+    :param flg_new:
+    :return: a list of URL´s
     """
-    try:
-        # read the info from config file
-        conf_file = read_db_config()
-        # open the connection
-        conn = MySQLConnection(**conf_file)
+    # try:
+    # read the info from config file
+    conf_file = read_db_config()
+    # open the connection
+    conn = MySQLConnection(**conf_file)
 
-        # create and execute the query
-        cursor = conn.cursor()
+    # create and execute the query
+    cursor = conn.cursor()
 
-        sql = "select a.url, " \
-              "length(a.url) length_url, " \
-              "length(substring(a.url, locate('?', a.url), length(a.url))) length_querystring," \
-              "length(a.url) - length(REPLACE(a.url,'.','')) nbr_dot, " \
-              "length(a.url) - length(REPLACE(a.url,'/','')) nbr_fslash, " \
-              "length(a.url) - length(REPLACE(a.url,'&','')) nbr_ampersand, " \
-              "length(a.url) - length(REPLACE(a.url,'-','')) nbr_hyphen, " \
-              "length(a.url) - length(REPLACE(a.url,'_','')) nbr_underscore, " \
-              "case when locate('www', a.url) > 0 then 1 else 0 end exist_www, " \
-              "CAST(a.url as SIGNED) AS nbr_digit, " \
-              "case when substring(a.url, locate('.com', a.url), length(a.url)) > 0 then 1 else 0 end if_com, " \
-              "count(1) as qty_references " \
-              "from tb_base_set a inner join tb_link_references b on a.url = b.top_url "
-        if url is not None:
-            sql += " where a.url = %s group by a.url"
-            cursor.execute(sql, (url,))
-        else:
-            sql += "group by a.url"
-            cursor.execute(sql)
+    if flg_new == 1:
+        cursor.execute("SELECT url, feature_01, feature_02, feature_03, feature_04, feature_05, "
+                       "feature_06, feature_07, feature_08, feature_09, feature_10 "
+                       "FROM tb_link_references_summary where id_base_set = %s", (id_base_set,))
+    else:
+        cursor.execute("SELECT url, feature_01, feature_02, feature_03, feature_04, feature_05, "
+                       "feature_06, feature_07, feature_08, feature_09, feature_10, qty_references "
+                       "FROM tb_link_references_summary where id_base_set = %s", (id_base_set,))
 
-        lst_data = cursor.fetchall()
+    # return row using List datatype
+    lst_data = cursor.fetchall()
 
-        # close the objects
-        cursor.close()
-        conn.close()
+    # close the objects
+    cursor.close()
+    conn.close()
+    return lst_data
 
-        return lst_data
-
-    except Error as e:
-        print(e)
+#except Error as e:
+#        print(e)
 
 
-def unload():
-    """ Remove all information from the tb_link_references table
+def write_link_references_summary(id_base_set):
+    """ write the summary info the database
+    :param id_base_set: id info to be returned
+    :return: None
+    """
+    # try:
+    # read the info from config file
+    conf_file = read_db_config()
+    # open the connection
+    conn = MySQLConnection(**conf_file)
+
+    # create and execute the query
+    cursor = conn.cursor()
+
+    sql = "Insert into tb_link_references_summary (id_base_set, url, feature_01, feature_02, " \
+          "feature_03, feature_04 , feature_05, feature_06, feature_07, feature_08, feature_09, " \
+          "feature_10,qty_references) " \
+          "select b.id_base_set, b.url, " \
+          "length(b.url) length_url, " \
+          "case when locate('?', b.url) > 0 then " \
+          "length(substring(b.url, locate('?', b.url) + 1, length(b.url))) " \
+          "else 0 end length_querystring, " \
+          "length(b.url) - length(REPLACE(b.url,'.','')) nbr_dot, " \
+          "length(b.url) - length(REPLACE(b.url,'/','')) nbr_slash, " \
+          "length(b.url) - length(REPLACE(b.url,'&','')) nbr_ampersand, " \
+          "length(b.url) - length(REPLACE(b.url,'-','')) nbr_hyphen, " \
+          "length(b.url) - length(REPLACE(b.url,'_','')) nbr_underscore, " \
+          "case when locate('www', b.url) > 0 then 1 else 0 end exist_www, " \
+          "length(b.url) - length(REPLACE(b.url,'@','')) nbr_at, " \
+          "case when length(substring(b.url, locate('.com', b.url), length(b.url))) > 0 then 1 else 0 end if_com, " \
+          "count(b.url) as qty_references " \
+          "from tb_link_references_raw b " \
+          "where b.id_base_set = %s group by b.url " \
+          "union " \
+          "select distinct b.id_base_set, b.top_url, " \
+          "length(b.top_url) length_url, " \
+          "case when locate('?', b.top_url) > 0 then " \
+          "length(substring(b.top_url, locate('?', b.top_url) + 1, length(b.top_url))) " \
+          "else 0 end length_querystring, " \
+          "length(b.top_url) - length(REPLACE(b.top_url,'.','')) nbr_dot, " \
+          "length(b.top_url) - length(REPLACE(b.top_url,'/','')) nbr_slash, " \
+          "length(b.top_url) - length(REPLACE(b.top_url,'&','')) nbr_ampersand, " \
+          "length(b.top_url) - length(REPLACE(b.top_url,'-','')) nbr_hyphen, " \
+          "length(b.top_url) - length(REPLACE(b.top_url,'_','')) nbr_underscore, " \
+          "case when locate('www', b.top_url) > 0 then 1 else 0 end exist_www, " \
+          "length(b.top_url) - length(REPLACE(b.top_url,'@','')) nbr_at, " \
+          "case when length(substring(b.top_url, locate('.com', b.top_url), length(b.top_url))) > 0 " \
+          "then 1 else 0 end if_com " \
+          ",0 as qty_references " \
+          "from tb_link_references_raw b " \
+          "where b.id_base_set = %s and not exists (select 1 from tb_link_references_raw a " \
+          "where a.url=b.top_url and a.id_base_set = %s)"
+
+    cursor.execute(sql, (id_base_set, id_base_set, id_base_set))
+    conn.commit()
+
+    # close the objects
+    cursor.close()
+    conn.close()
+
+    # except Error as e:
+    #    print(e)
+
+
+def clear():
+    """ Remove all information from the tables
     :return: None
     """
     try:
@@ -188,14 +225,11 @@ def unload():
 
         # create and execute the query
         cursor = conn.cursor()
-
-        # create and execute the query
-        cursor = conn.cursor()
-
-        sql = "truncate table tb_link_references"
-
-        cursor.execute(sql)
-
+        cursor.execute("truncate table tb_base_set")
+        conn.commit()
+        cursor.execute("truncate table tb_link_references_raw")
+        conn.commit()
+        cursor.execute("truncate table tb_link_references_summary")
         conn.commit()
 
         # close the objects
@@ -216,9 +250,6 @@ def log_msg(message):
         conf_file = read_db_config()
         # open the connection
         conn = MySQLConnection(**conf_file)
-
-        # create and execute the query
-        cursor = conn.cursor()
 
         # create and execute the query
         cursor = conn.cursor()

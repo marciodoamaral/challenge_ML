@@ -4,7 +4,7 @@ import re
 
 
 # function to return the links inside URL
-def search_links(url, depth, list_url):
+def search_links(id_base_set, url, depth, list_url):
     parent_url = url
 
     # if reach the last level
@@ -26,10 +26,10 @@ def search_links(url, depth, list_url):
                     href_address = str(obj.attrs['href']).replace("<", "")
 
                     if href_address not in list_url:
-                        dict_href = {"parent_url": parent_url, "url": href_address, "level": depth}
+                        dict_href = {"id_base_set": id_base_set, "parent_url": parent_url, "url": href_address, "level": depth}
                         list_url.append(dict_href)
                         # calling it self
-                        search_links(href_address, depth - 1, list_url)
+                        search_links(id_base_set, href_address, depth - 1, list_url)
         except:
             pass
 
