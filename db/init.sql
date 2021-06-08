@@ -8,18 +8,27 @@ CREATE TABLE tb_base_set (
   PRIMARY KEY(id_base_set)
 );
 
-CREATE TABLE tb_link_references_raw (
-  id_link_references int NOT NULL AUTO_INCREMENT,
-  id_base_set int NOT NULL,
+INSERT INTO tb_base_set
+  (url)
+VALUES
+  ('https://www.google.com'),
+  ('https://about.google/?utm_source=google-BR&utm_medium=referral&utm_campaign=hp-footer&fg=1');
+
+CREATE TABLE tb_link_reference_raw (
   level VARCHAR(3) NOT NULL,
   top_url VARCHAR(300) NOT NULL,
-  url VARCHAR(300) NOT NULL,
-  PRIMARY KEY(id_link_references)
+  url VARCHAR(300) NOT NULL
 );
 
-CREATE TABLE tb_link_references_summary (
-  id_link_references_summary int NOT NULL AUTO_INCREMENT,
-  id_base_set int NOT NULL,
+CREATE TABLE tb_link_reference_summary (
+  id_link_reference_summary int NOT NULL AUTO_INCREMENT,
+  url VARCHAR(300) NOT NULL,
+  qty_reference int,
+  PRIMARY KEY(id_link_reference_summary)
+);
+
+CREATE TABLE tb_link_reference_feature_summary (
+  id_link_reference_summary int NOT NULL AUTO_INCREMENT,
   url VARCHAR(300) NOT NULL,
   feature_01 int,
   feature_02 int,
@@ -31,8 +40,8 @@ CREATE TABLE tb_link_references_summary (
   feature_08 int,
   feature_09 int,
   feature_10 int,
-  qty_references int,
-  PRIMARY KEY(id_link_references_summary)
+  qty_reference int,
+  PRIMARY KEY(id_link_reference_summary)
 );
 
 CREATE TABLE tb_log (
