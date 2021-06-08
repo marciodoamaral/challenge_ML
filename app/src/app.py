@@ -12,6 +12,30 @@ def clear():
 	return "ok"
 
 
+@app.route("/api/v1/resources/load", methods=['GET'])
+def load():
+
+	# clear the database
+	db.clear()
+	# get the URL from base set
+	lst_base_set = db.read_base_set()
+	# get the depth level to crawler
+	depth = int(db.read_db_config(section='parameter').get("depth"))
+	for url in lst_base_set:
+		# crawler the page
+		lst_url = []
+		lst_results = crawler.search_links(url, depth, lst_url)
+		# write the results in the raw table
+		db.write_link_reference_raw(lst_results)
+
+	# write in the summary table
+	db.write_link_reference_summary()
+	# write summary feature table
+	db.write_link_reference_feature_summary()
+
+	return jsonify(db.read_link_reference_feature_summary())
+
+
 @app.route("/api/v1/resources/search", methods=['GET'])
 def search():
 
@@ -23,27 +47,15 @@ def search():
 	else:
 		return "Error: No url field provided. Please specify an url."
 
-	flg_new = 0
-	# read the data from base set table
-	id_base_set = db.read_base_set(url)
-	# meaning new url
-	if id_base_set is None:
-		flg_new = 1
-		# write the url in the base set table
-		id_base_set = db.write_base_set(url)
-		# get the depth level to crawler
-		depth = int(db.read_db_config(section='parameter').get("depth"))
-		# crawler the page
-		lst_url = []
-		lst_results = crawler.search_links(id_base_set, url, depth, lst_url)
-		# write the results in the raw table
-		db.write_link_references(lst_results)
-		# write the results in the summary table
-		db.write_link_references_summary(id_base_set)
+	is_new = 0
+	if db.search_url(url) == 0:
+		is_new = 1
+		# write in the summary table
+		db.write_link_reference_summary(url)
+		# write summary feature table
+		db.write_link_reference_feature_summary()
 
-	# return the array with all information
-	lst_return = db.read_link_references_summary(id_base_set, flg_new)
-	return jsonify(lst_return)
+	return jsonify(db.read_link_reference_feature_summary(url, is_new))
 
 
 @app.errorhandler(404)
