@@ -1,5 +1,6 @@
-from mysql.connector import MySQLConnection, Error
+""" Module used to access information"""
 from configparser import ConfigParser
+from mysql.connector import MySQLConnection, Error
 
 
 def read_db_config(filename='config.ini', section='mysql'):
@@ -30,6 +31,7 @@ def search_url(url):
     :param url: url to be search
     :return: an integer number of row.
     """
+    cnt_row = None
     try:
 
         # read the info from config file
@@ -39,7 +41,8 @@ def search_url(url):
 
         # create and execute the query
         cursor = conn.cursor()
-        cursor.execute('SELECT coalesce(count(1), 0) cnt FROM tb_link_reference_summary where url = %s', (url,))
+        cursor.execute('SELECT coalesce(count(1), 0) cnt FROM '
+                       'tb_link_reference_summary where url = %s', (url,))
 
         # return row using List datatype
         cnt_row = cursor.fetchone()[0]
@@ -47,10 +50,11 @@ def search_url(url):
         # close the objects
         cursor.close()
         conn.close()
-        return cnt_row
 
-    except Error as e:
-        print(e)
+    except Error as error_msg:
+        print(error_msg)
+
+    return cnt_row
 
 
 def clear():
@@ -76,14 +80,15 @@ def clear():
         cursor.close()
         conn.close()
 
-    except Error as e:
-        print(e)
+    except Error as error_msg:
+        print(error_msg)
 
 
 def read_base_set(*args):
     """ Read the tb_base_set file and return a list data type with URL column
     :return: a list of URL´s
     """
+    lst_data = None
     try:
         # read the info from config file
         conf_file = read_db_config()
@@ -103,47 +108,58 @@ def read_base_set(*args):
         # close the objects
         cursor.close()
         conn.close()
-        return lst_data
-    except Error as e:
-        print(e)
+
+    except Error as error_msg:
+        print(error_msg)
+
+    return lst_data
 
 
 def read_link_reference_feature_summary(*args):
     """ Read the tb_base_set file and return a list data type with URL column
     :return: a list of URL´s
     """
-    try:
-        # read the info from config file
-        conf_file = read_db_config()
-        # open the connection
-        conn = MySQLConnection(**conf_file)
+    lst_data = None
+    # try:
 
-        # create and execute the query
-        cursor = conn.cursor()
-        if len(args) > 0:
-            if args[1] == 1:
-                sql = "SELECT url, feature_01, feature_02, feature_03, feature_04, feature_05, "\
-                      "feature_06, feature_07, feature_08, feature_09, feature_10 " \
-                      "FROM tb_link_reference_feature_summary where url = %s"
-            else:
-                sql = "SELECT url, feature_01, feature_02, feature_03, feature_04, feature_05, " \
-                      "feature_06, feature_07, feature_08, feature_09, feature_10, qty_reference " \
-                      "FROM tb_link_reference_feature_summary where url = %s"
-            cursor.execute(sql, (args[0],))
+    # read the info from config file
+    conf_file = read_db_config()
+    # open the connection
+    conn = MySQLConnection(**conf_file)
+
+    # when no parameters, return all rows with all columns
+    # when has parameters and it is new url, no return qty for specific url
+    # when has parameters and it is not new url, return all columns for specific url
+    # create and execute the query
+    cursor = conn.cursor()
+    if len(args) > 0:
+        if args[1] == 1:
+            sql = "SELECT url, feature_01, feature_02, feature_03, feature_04, feature_05, " \
+                  "feature_06, feature_07, feature_08, feature_09, feature_10 " \
+                  "FROM tb_link_reference_feature_summary where url = %s"
         else:
-            cursor.execute('SELECT url, feature_01, feature_02, feature_03, feature_04, feature_05, '
-                           'feature_06, feature_07, feature_08, feature_09, feature_10, qty_reference '
-                           'FROM tb_link_reference_feature_summary')
+            sql = "SELECT url, feature_01, feature_02, feature_03, feature_04, feature_05, " \
+                  "feature_06, feature_07, feature_08, feature_09, feature_10, qty_reference " \
+                  "FROM tb_link_reference_feature_summary where url = %s"
+        cursor.execute(sql, (args[0],))
+    else:
+        cursor.execute('SELECT url, feature_01, feature_02, feature_03, feature_04, '
+                       'feature_05, feature_06, feature_07, feature_08, feature_09, '
+                       'feature_10, qty_reference '
+                       'FROM tb_link_reference_feature_summary '
+                       'where qty_reference is not null ')
 
-        # return row using List datatype
-        lst_data = cursor.fetchall()
+    # return row using List datatype
+    lst_data = cursor.fetchall()
 
-        # close the objects
-        cursor.close()
-        conn.close()
-        return lst_data
-    except Error as e:
-        print(e)
+    # close the objects
+    cursor.close()
+    conn.close()
+
+    # except Error as error_msg:
+    #    print(error_msg)
+
+    return lst_data
 
 
 def write_link_reference_raw(lst_data):
@@ -186,12 +202,17 @@ def write_link_reference_summary(*args):
     # create and execute the query
     cursor = conn.cursor()
     if len(args) == 0:
-        sql = "INSERT INTO tb_link_reference_summary(url,qty_reference) " \
-              "select a.url, " \
-              "coalesce(count(b.url),0) as qty_reference " \
-              "from tb_base_set a " \
-              "left join tb_link_reference_raw b " \
-              "on a.url=b.url group by a.url "
+        sql = "Insert into tb_link_reference_summary (url, qty_reference) " \
+              "select b.url, " \
+              "count(b.url) as qty_reference " \
+              "from tb_link_reference_raw b " \
+              "group by b.url " \
+              "union " \
+              "select distinct b.top_url, " \
+              "0 as qty_reference " \
+              "from tb_link_reference_raw b " \
+              "where not exists (select 1 from tb_link_reference_raw a " \
+              "where a.url=b.top_url)"
         cursor.execute(sql)
     else:
         sql = "Insert into tb_link_reference_summary (url, qty_reference) values(%s, null)"
@@ -235,7 +256,8 @@ def write_link_reference_feature_summary(*args):
           "length(b.url) - length(REPLACE(b.url,'_','')) nbr_underscore, " \
           "case when locate('www', b.url) > 0 then 1 else 0 end exist_www, " \
           "length(b.url) - length(REPLACE(b.url,'@','')) nbr_at, " \
-          "case when length(substring(b.url, locate('.com', b.url), length(b.url))) > 0 then 1 else 0 end if_com, " \
+          "case when length(substring(b.url, locate('.com', b.url), length(b.url))) > 0 " \
+          "then 1 else 0 end if_com, " \
           "b.qty_reference " \
           "from tb_link_reference_summary b "
 
@@ -255,6 +277,37 @@ def write_link_reference_feature_summary(*args):
 
     # except Error as e:
     #    print(e)
+
+
+def update_link_reference(url, qty_reference):
+    """ Write log information in the table
+    :param url: message to log
+    :param qty_reference:
+    :return: None
+    """
+    # try:
+    # read the info from config file
+    conf_file = read_db_config()
+    # open the connection
+    conn = MySQLConnection(**conf_file)
+
+    # create and execute the query
+    cursor = conn.cursor()
+
+    sql = "update tb_link_reference_summary set qty_reference = %s where url = %s"
+    cursor.execute(sql, (qty_reference, url))
+    conn.commit()
+
+    sql = "update tb_link_reference_feature_summary set qty_reference = %s where url = %s"
+    cursor.execute(sql, (qty_reference, url))
+    conn.commit()
+
+    # close the objects
+    cursor.close()
+    conn.close()
+
+    # except Error as error_msg:
+    #    print(error_msg)
 
 
 def log_msg(message):
@@ -282,5 +335,5 @@ def log_msg(message):
         cursor.close()
         conn.close()
 
-    except Error as e:
-        print(e)
+    except Error as error_msg:
+        print(error_msg)

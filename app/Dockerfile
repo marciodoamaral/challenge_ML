@@ -14,5 +14,10 @@ RUN pip install --user -r requirements.txt
 COPY ./src/ .
 COPY ./config/ .
 
+# create the model directory and env variables
+RUN mkdir model
+ENV MODEL_DIR=/app/model
+ENV MODEL_FILE=clf_rf.joblib
+
 # command to run on container start
 CMD [ "python", "./app.py" ]
